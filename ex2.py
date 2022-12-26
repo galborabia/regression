@@ -111,7 +111,7 @@ class OlsGd(Ols):
                 print(f"Epoch {epoch}: loss = {epochs_loss[epoch]}")
 
             if self.early_stop and epoch >= 2:
-                if abs(epochs_loss[epoch - 1] - epochs_loss[epoch]) <= 1e-3:
+                if abs(epochs_loss[epoch - 1] - epochs_loss[epoch]) <= 1e-5:
                     if self.verbose:
                         print(f"Early stopping condition met, number of iteration {epoch}")
                     break
@@ -138,23 +138,16 @@ class OlsGd(Ols):
         return loss.item()
 
 
-class RidgeLs(OlsGd):
+class RidgeLs(Ols):
     def __init__(self, ridge_lambda, *wargs, **kwargs):
         super(RidgeLs, self).__init__(*wargs, **kwargs)
         self.ridge_lambda = ridge_lambda
 
-    def _step(self, X, Y):
-        # use w update for gradient descent
-        y_pred = self._predict(X)
-
-        # using regularization on the loss function
-        loss = torch.square(y_pred - Y).mean() + self.ridge_lambda * torch.square(self.w).sum()
-        loss.backward()
-
-        with torch.no_grad():
-            self.w.sub_(self.learning_rate * self.w.grad)
-        self.w.grad.zero_()
-        return loss.item()
+    def _fit(self, X, Y):
+        covariance = np.dot(X.T, X) + np.identity(X.shape[1]) * self.ridge_lambda
+        correlation = np.dot(X.T, Y)
+        weights = np.dot(np.linalg.pinv(covariance), correlation)
+        self.w = weights
 
 
 # Solution to the questions
@@ -281,7 +274,7 @@ plt.legend()
 plt.show()
 
 # Ridgels
-ridgels = RidgeLs(ridge_lambda=1e-2, num_iteration=100000, learning_rate=0.01, verbose=False)
+ridgels = RidgeLs(ridge_lambda=1e-2)
 ridgels.fit(X_train, y_train)
 train_score = ridgels.score(X_train, y_train)
 test_score = ridgels.score(X_test, y_test)

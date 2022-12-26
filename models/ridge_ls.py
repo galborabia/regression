@@ -1,21 +1,14 @@
-import torch
-from models.olg_gd import OlsGd
+import numpy as np
+from models.ols import Ols
 
 
-class RidgeLs(OlsGd):
+class RidgeLs(Ols):
     def __init__(self, ridge_lambda, *wargs, **kwargs):
         super(RidgeLs, self).__init__(*wargs, **kwargs)
         self.ridge_lambda = ridge_lambda
 
-    def _step(self, X, Y):
-        # use w update for gradient descent
-        y_pred = self._predict(X)
-
-        # using regularization on the loss function
-        loss = torch.square(y_pred - Y).mean() + self.ridge_lambda * torch.square(self.w).sum()
-        loss.backward()
-
-        with torch.no_grad():
-            self.w.sub_(self.learning_rate * self.w.grad)
-        self.w.grad.zero_()
-        return loss.item()
+    def _fit(self, X, Y):
+        covariance = np.dot(X.T, X) + np.identity(X.shape[1]) * self.ridge_lambda
+        correlation = np.dot(X.T, Y)
+        weights = np.dot(np.linalg.pinv(covariance), correlation)
+        self.w = weights
